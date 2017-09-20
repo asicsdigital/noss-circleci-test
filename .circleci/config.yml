@@ -6,3 +6,8 @@ jobs:
     steps:
       - checkout
       - run: echo "hello world"
+      - run:
+          name: echo tag and branch
+          command: |
+            echo "Circle tag is: " $CIRCLE_TAG
+            echo "Circle branch is: " $CIRCLE_BRANCH
