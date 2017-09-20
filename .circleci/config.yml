@@ -11,3 +11,13 @@ jobs:
           command: |
             echo "Circle tag is: " $CIRCLE_TAG
             echo "Circle branch is: " $CIRCLE_BRANCH
+
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /v.*/
