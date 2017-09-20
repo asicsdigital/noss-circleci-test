@@ -9,8 +9,20 @@ jobs:
       - run:
           name: echo tag and branch
           command: |
-            echo "Circle tag is: " $CIRCLE_TAG
-            echo "Circle branch is: " $CIRCLE_BRANCH
+            if [ "$CIRCLE_BRANCH" == "master" -a "$CIRCLE_TAG" ]; then
+              DOCKER_TAG=latest
+              DOCKER_TAG2=$CIRCLE_TAG
+            elif [ "$CIRCLE_BRANCH" == "master" ]; then
+              DOCKER_TAG=latest
+            elif [ "$CIRCLE_TAG" ]; then
+              DOCKER_TAG=$CIRCLE_TAG
+            else
+              DOCKER_TAG=$CIRCLE_BRANCH
+            fi
+            echo "tag is: " $DOCKER_TAG
+            if [ "$DOCKER_TAG2" ]; then
+              echo "tag2 is: " $DOCKER_TAG2
+            fi
 
 
 workflows:
