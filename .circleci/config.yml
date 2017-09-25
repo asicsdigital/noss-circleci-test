@@ -33,4 +33,4 @@ workflows:
       - build:
           filters:
             tags:
-              only: /v.*/
+              only: /^v([[:digit:]]+\.){2}[[:digit:]]+$/
