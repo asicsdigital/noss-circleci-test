@@ -14,16 +14,35 @@ jobs:
             elif [[ "$CIRCLE_BRANCH" = "master" ]]; then
               DOCKER_TAG=latest
               DOCKER_TAG2="build-${CIRCLE_BUILD_NUM}"
+            elif [[ "$CIRCLE_TAG" = "deploy-dev" ]]; then
+              DOCKER_TAG="deploy-dev-${CIRCLE_BUILD_NUM}-${CIRCLE_BRANCH}"
+            elif [[ "$CIRCLE_TAG" = "deploy-staging" ]]; then
+              DOCKER_TAG="deploy-staging-${CIRCLE_BUILD_NUM}-${CIRCLE_BRANCH}"
             elif [[ "$CIRCLE_TAG" ]]; then
               DOCKER_TAG=$CIRCLE_TAG
             else
               DOCKER_TAG=$CIRCLE_BRANCH
             fi
             echo "tag is: " $DOCKER_TAG
-            if [ "$DOCKER_TAG2" ]; then
+            if [[ "$DOCKER_TAG2" ]]; then
               echo "tag2 is: " $DOCKER_TAG2
             fi
-
+  deploy-dev:
+    docker:
+      - image: docker:stable
+    steps:
+      - run:
+          name: Placeholder for deploy dev
+          command: |
+            echo "placeholder for deploying image: deploy-dev-${CIRCLE_BUILD_NUM}-${CIRCLE_BRANCH} to dev environment"
+  deploy-staging:
+    docker:
+      - image: docker:stable
+    steps:
+      - run:
+          name: Placeholder for deploy staging
+          command: |
+            echo "placeholder for deploying image: deploy-staging-${CIRCLE_BUILD_NUM}-${CIRCLE_BRANCH} to staging environment"
 
 
 workflows:
@@ -33,4 +52,17 @@ workflows:
       - build:
           filters:
             tags:
-              only: /^v(\d+\.){2}\d+$/
+              only: /.*/
+      - deploy-dev:
+          filters:
+            tags:
+              only: deploy-dev
+            branches:
+              ignore: /.*/
+      - deploy-staging:
+          filters:
+            tags:
+              only: deploy-staging
+            branches:
+              ignore: /.*/
+
