@@ -57,12 +57,16 @@ workflows:
             tags:
               only: /.*/
       - deploy-dev:
+          requires:
+            - build
           filters:
             tags:
               only: deploy-dev
             branches:
               ignore: /.*/
       - deploy-staging:
+          requires:
+            - build
           filters:
             tags:
               only: deploy-staging
