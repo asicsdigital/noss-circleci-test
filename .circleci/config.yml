@@ -25,6 +25,7 @@ jobs:
               DOCKER_TAG=$CIRCLE_TAG
             else
               DOCKER_TAG=$CIRCLE_BRANCH
+              DOCKER_TAG2="${CIRCLE_BRANCH}-build-${CIRCLE_BUILD_NUM}"
             fi
             echo "tag is: " $DOCKER_TAG
             if [[ "$DOCKER_TAG2" ]]; then
