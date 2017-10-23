@@ -8,6 +8,9 @@ jobs:
       - run:
           name: echo tag and branch
           command: |
+            if [[ "$CIRCLE_TAG" && ! "$CIRCLE_BRANCH" ]]; then
+              CIRCLE_BRANCH=$(git branch --contains tags/${CIRCLE_TAG} | awk '{print $2}')
+            fi
             if [[ "$CIRCLE_BRANCH" = "master" && "$CIRCLE_TAG" ]]; then
               DOCKER_TAG=latest
               DOCKER_TAG2=$CIRCLE_TAG
