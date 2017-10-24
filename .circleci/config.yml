@@ -36,7 +36,11 @@ jobs:
       - run:
           name: Placeholder for deploy dev
           command: |
-            echo "placeholder for deploying image: $CIRCLE_TAG to dev environment"
+            echo "triggering circle ci build that would deploy image: $CIRCLE_TAG to dev environment"
+            curl -u ${CIRCLE_API_TOKEN}: \
+              --data build_parameters[CIRCLE_JOB]=deploy-dev \
+              --data build_parameters[IMAGE_TAG]=${CIRCLE_TAG} \
+              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/deploy-dev
   deploy-staging:
     docker:
       - image: docker:stable
