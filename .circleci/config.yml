@@ -37,6 +37,7 @@ jobs:
           name: Placeholder for deploy dev
           command: |
             echo "installing curl"
+            apk update
             apk add curl
             echo "triggering circle ci build that would deploy image: $CIRCLE_TAG to dev environment"
             curl -u ${CIRCLE_API_TOKEN}: \
