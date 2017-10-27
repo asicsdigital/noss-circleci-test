@@ -63,7 +63,7 @@ jobs:
             RETURN=$(curl -u ${CIRCLE_API_TOKEN}: \
               --data build_parameters[CIRCLE_JOB]=deploy-dev \
               --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
-              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/deploy-dev)
+              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/master)
             echo $RETURN | python3 -m json.tool
             BUILD_URL=$(echo $RETURN | python3 -c "import sys, json; print(json.load(sys.stdin)['build_url'])")
             echo "check ${BUILD_URL} for deploy status"
@@ -103,8 +103,14 @@ jobs:
               echo "could not read image tag from workspace"
               exit 1
             fi
-            echo "placeholder for deploying image: $IMAGE_TAG to production"
-
+            echo "triggering circle ci build that would deploy image: ${IMAGE_TAG} to prod"
+            RETURN=$(curl -u ${CIRCLE_API_TOKEN}: \
+              --data build_parameters[CIRCLE_JOB]=deploy-prod \
+              --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
+              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/master)
+            echo $RETURN | python3 -m json.tool
+            BUILD_URL=$(echo $RETURN | python3 -c "import sys, json; print(json.load(sys.stdin)['build_url'])")
+            echo "check ${BUILD_URL} for deploy status"
 
 workflows:
   version: 2
