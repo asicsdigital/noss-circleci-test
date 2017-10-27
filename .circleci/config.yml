@@ -85,7 +85,7 @@ jobs:
             RETURN=$(curl -u ${CIRCLE_API_TOKEN}: \
               --data build_parameters[CIRCLE_JOB]=deploy-staging \
               --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
-              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/deploy-staging)
+              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/master)
             echo $RETURN | python3 -m json.tool
             BUILD_URL=$(echo $RETURN | python3 -c "import sys, json; print(json.load(sys.stdin)['build_url'])")
             echo "check ${BUILD_URL} for deploy status"
