@@ -60,9 +60,6 @@ jobs:
               exit 1
             fi
             echo "triggering circle ci build that would deploy image: ${IMAGE_TAG} to dev environment"
-            echo "installing curl"
-            apk update
-            apk add curl
             RETURN=$(curl -u ${CIRCLE_API_TOKEN}: \
               --data build_parameters[CIRCLE_JOB]=deploy-dev \
               --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
