@@ -47,7 +47,7 @@ jobs:
             - image_tag
   deploy-dev:
     docker:
-      - image: docker:stable
+      - image: circleci/python:3
     steps:
       - attach_workspace:
           at: /tmp/workspace
