@@ -16,10 +16,10 @@ jobs:
               DOCKER_BUILD_TAG="build-${CIRCLE_BUILD_NUM}"
             elif [[ "$CIRCLE_TAG" ]]; then
               DOCKER_TAG=$CIRCLE_TAG
-              if [[ $CIRCLE_TAG =~ ^deploy-dev- ]]; then
+              if [[ "$CIRCLE_TAG" =~ "^deploy-dev-.+" ]]; then
                 DOCKER_TAG=deploy-dev
                 DOCKER_BUILD_TAG=$CIRCLE_TAG
-              elif [[ $CIRCLE_TAG =~ ^deploy-staging- ]]; then
+              elif [[ "$CIRCLE_TAG" =~ "^deploy-staging-.+" ]]; then
                 DOCKER_TAG=deploy-staging
                 DOCKER_BUILD_TAG=$CIRCLE_TAG
               fi
@@ -30,12 +30,12 @@ jobs:
               DOCKER_TAG=$CIRCLE_BRANCH
               DOCKER_BUILD_TAG="${CIRCLE_BRANCH}-build-${CIRCLE_BUILD_NUM}"
             fi
-            echo "docker tag is: " $DOCKER_TAG
+            echo "docker tag is: ${DOCKER_TAG}"
             if [[ "$DOCKER_BUILD_TAG" ]]; then
-              echo "docker build tag is: " $DOCKER_BUILD_TAG
+              echo "docker build tag is: ${DOCKER_BUILD_TAG}"
+              mkdir -p /tmp/workspace
+              echo $DOCKER_BUILD_TAG > /tmp/workspace/image_tag
             fi
-            mkdir -p /tmp/workspace
-            echo $DOCKER_BUILD_TAG > /tmp/workspace/image_tag
       - persist_to_workspace:
           root: /tmp/workspace
           paths:
@@ -44,36 +44,54 @@ jobs:
     docker:
       - image: docker:stable
     steps:
+      - attach_workspace:
+          at: /tmp/workspace
       - run:
           name: Placeholder for deploy dev
           command: |
+            IMAGE_TAG=$(cat /tmp/workspace/image_tag)
+            if [[ ! "$IMAGE_TAG" ]]; then
+              echo "could not read image tag from workspace"
+              exit 1
+            fi
+            echo "triggering circle ci build that would deploy image: ${IMAGE_TAG} to dev environment"
             echo "installing curl"
             apk update
             apk add curl
-            echo "triggering circle ci build that would deploy image: $CIRCLE_TAG to dev environment"
             curl -u ${CIRCLE_API_TOKEN}: \
               --data build_parameters[CIRCLE_JOB]=deploy-dev \
-              --data build_parameters[IMAGE_TAG]=${CIRCLE_TAG} \
+              --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
               https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/deploy-dev
   deploy-staging:
     docker:
       - image: docker:stable
     steps:
+      - attach_workspace:
+          at: /tmp/workspace
       - run:
           name: Placeholder for deploy staging
           command: |
-            echo "placeholder for deploying image: $CIRCLE_TAG to staging environment"
+            IMAGE_TAG=$(cat /tmp/workspace/image_tag)
+            if [[ ! "$IMAGE_TAG" ]]; then
+              echo "could not read image tag from workspace"
+              exit 1
+            fi
+            echo "placeholder for deploying image: $IMAGE_TAG to staging environment"
   deploy-prod:
     docker:
       - image: docker:stable
     steps:
       - attach_workspace:
-         at: /tmp/workspace
+          at: /tmp/workspace
       - run:
           name: Placeholder for deploy prod
           command: |
-            echo "found tag: "
-            cat /tmp/workspace/image_tag
+            IMAGE_TAG=$(cat /tmp/workspace/image_tag)
+            if [[ ! "$IMAGE_TAG" ]]; then
+              echo "could not read image tag from workspace"
+              exit 1
+            fi
+            echo "placeholder for deploying image: $IMAGE_TAG to production"
 
 
 workflows:
@@ -83,13 +101,13 @@ workflows:
       - build:
           filters:
             tags:
-              only: /.*/
+              only: /^(v(\d+\.){2}\d+|deploy-(dev-.+|staging-.+))$/
       - deploy-dev:
           requires:
             - build
           filters:
             tags:
-              only: /^deploy-dev-.*/
+              only: /^deploy-dev-.+/
             branches:
               ignore: /.*/
       - deploy-staging:
@@ -97,7 +115,7 @@ workflows:
             - build
           filters:
             tags:
-              only: /^deploy-staging-.*/
+              only: /^deploy-staging-.+/
             branches:
               ignore: /.*/
       - deploy-prod:
