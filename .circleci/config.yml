@@ -16,10 +16,10 @@ jobs:
               DOCKER_BUILD_TAG="build-${CIRCLE_BUILD_NUM}"
             elif [[ "$CIRCLE_TAG" ]]; then
               DOCKER_TAG=$CIRCLE_TAG
-              if [[ "$CIRCLE_TAG" =~ "^deploy-dev-.*" ]]; then
+              if [[ $CIRCLE_TAG =~ ^deploy-dev- ]]; then
                 DOCKER_TAG=deploy-dev
                 DOCKER_BUILD_TAG=$CIRCLE_TAG
-              elif [[ "$CIRCLE_TAG" =~ "^deploy-staging-.*" ]]; then
+              elif [[ $CIRCLE_TAG =~ ^deploy-staging- ]]; then
                 DOCKER_TAG=deploy-staging
                 DOCKER_BUILD_TAG=$CIRCLE_TAG
               fi
