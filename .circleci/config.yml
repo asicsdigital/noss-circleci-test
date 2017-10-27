@@ -8,7 +8,10 @@ jobs:
       - run:
           name: echo tag and branch
           command: |
+            # setup empty workspace for persisting DOCKER_BUILD_TAG
             mkdir -p /tmp/workspace
+            echo > /tmp/workspace/image_tag
+            # setup proper tags
             if [[ "$CIRCLE_BRANCH" = "master" && "$CIRCLE_TAG" ]]; then
               DOCKER_TAG=latest
               DOCKER_BUILD_TAG=$CIRCLE_TAG
@@ -31,9 +34,10 @@ jobs:
               DOCKER_TAG=$CIRCLE_BRANCH
               DOCKER_BUILD_TAG="${CIRCLE_BRANCH}-build-${CIRCLE_BUILD_NUM}"
             fi
+            # process tags
             echo "docker tag is: ${DOCKER_TAG}"
-            echo $DOCKER_TAG > /tmp/workspace/image_tag
             if [[ "$DOCKER_BUILD_TAG" ]]; then
+              # persist DOCKER_BUILD_TAG
               echo "docker build tag is: ${DOCKER_BUILD_TAG}"
               echo $DOCKER_BUILD_TAG > /tmp/workspace/image_tag
             fi
@@ -63,6 +67,7 @@ jobs:
               --data build_parameters[CIRCLE_JOB]=deploy-dev \
               --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
               https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/deploy-dev
+            echo "check https://circleci.com/gh/FitnessKeeper/noss-circleci-test2 for deploy status"
   deploy-staging:
     docker:
       - image: docker:stable
