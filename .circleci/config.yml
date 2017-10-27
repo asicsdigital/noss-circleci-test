@@ -8,6 +8,7 @@ jobs:
       - run:
           name: echo tag and branch
           command: |
+            mkdir -p /tmp/workspace
             if [[ "$CIRCLE_BRANCH" = "master" && "$CIRCLE_TAG" ]]; then
               DOCKER_TAG=latest
               DOCKER_BUILD_TAG=$CIRCLE_TAG
@@ -31,9 +32,9 @@ jobs:
               DOCKER_BUILD_TAG="${CIRCLE_BRANCH}-build-${CIRCLE_BUILD_NUM}"
             fi
             echo "docker tag is: ${DOCKER_TAG}"
+            echo $DOCKER_TAG > /tmp/workspace/image_tag
             if [[ "$DOCKER_BUILD_TAG" ]]; then
               echo "docker build tag is: ${DOCKER_BUILD_TAG}"
-              mkdir -p /tmp/workspace
               echo $DOCKER_BUILD_TAG > /tmp/workspace/image_tag
             fi
       - persist_to_workspace:
