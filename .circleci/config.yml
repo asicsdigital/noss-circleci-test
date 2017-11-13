@@ -21,7 +21,7 @@ jobs:
                   break
                 else
                   echo found a non-merge commit that did not have a deploy- tag, this is error
-                  exit 1
+                  break
                 fi
               fi
             done
