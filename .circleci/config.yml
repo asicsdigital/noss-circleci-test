@@ -6,6 +6,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: git tag -l
+          command: git tag -l
+      - run:
           name: echo tag and branch
           command: |
             # setup empty workspace for persisting DOCKER_BUILD_TAG
