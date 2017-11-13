@@ -6,8 +6,30 @@ jobs:
     steps:
       - checkout
       - run:
-          name: git tag -l
-          command: git tag -l
+          name: find tag of most recent non-merge commit
+          command: |
+            for commit in $(git log -10 --pretty=format:"%H"); do
+              ismerge=$(git show --no-patch --format="%P" $commit | grep ' ' ; echo $? > /dev/null)
+              if [[ $ismerge ]] ; then
+                echo $commit was a merge
+                continue
+              else
+                echo $commit not a merge, checking tags
+                tag=$(git tag -l --points-at $commit | grep deploy-)
+                if [[ $? ]] ; then
+                  tagged_commit=$commit
+                  break
+                else
+                  echo found a non-merge commit that did not have a deploy- tag, this is error
+                  exit 1
+                fi
+              fi
+            done
+            if [[ $tag ]]; then
+              echo first tag found $tag to commit $tagged_commit
+            else
+              echo no tag found
+            fi
       - run:
           name: echo tag and branch
           command: |
