@@ -15,12 +15,12 @@ jobs:
                 continue
               else
                 echo $commit not a merge, checking tags
-                tag=$(git tag -l --points-at $commit | grep deploy-)
+                tag=$(git tag -l --points-at $commit | grep deploy-) || true
                 if [[ $? ]] ; then
                   tagged_commit=$commit
                   break
                 else
-                  echo found a non-merge commit that did not have a deploy- tag, this is error
+                  echo found a non-merge commit that did not have a deploy- tag
                   break
                 fi
               fi
