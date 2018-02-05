@@ -2,149 +2,191 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/python:3
+      - image: fitnesskeeper/docker-ci-builder
     steps:
       - checkout
       - run:
-          name: find tag of most recent non-merge commit
+          name: Build and push Docker image
           command: |
-            for commit in $(git log -10 --pretty=format:"%H"); do
-              ismerge=$(git show --no-patch --format="%P" $commit | grep ' ' ; echo $? > /dev/null)
-              if [[ $ismerge ]] ; then
-                echo $commit was a merge
-                continue
-              else
-                echo $commit not a merge, checking tags
-                tag=$(git tag -l --points-at $commit | grep deploy-) || true
-                if [[ $? ]] ; then
-                  tagged_commit=$commit
-                  break
-                else
-                  echo found a non-merge commit that did not have a deploy- tag
-                  break
-                fi
-              fi
-            done
-            if [[ $tag ]]; then
-              echo first tag found $tag to commit $tagged_commit
-            else
-              echo no tag found
-            fi
-      - run:
-          name: echo tag and branch
-          command: |
-            # setup empty workspace for persisting DOCKER_BUILD_TAG
+            # setup empty workspace for persisting DOCKER_BUILD_TAG/IMAGE_TAG
             mkdir -p /tmp/workspace
-            echo > /tmp/workspace/image_tag
+            echo > /tmp/workspace/docker_image
+            echo > /tmp/workspace/git_commit_sha
+            # check if this image exists already on dockerhub
+            echo "checking recent commits"
+            get-latest-nonmerge-commit.sh --debug
+            commit=$(get-latest-nonmerge-commit.sh)
+            if [[ "$commit" ]]; then
+              echo "most recent non-merge commit: $commit"
+              echo "would have checked dockerhub for it"
+              found=$FOUND
+              if [[ "$found" ]]; then
+                echo "found image already on dockerhub"
+                should_build=no
+              else
+                echo "didn't find this image tag on dockerhub"
+                should_build=yes
+              fi
+            else
+              echo "no non-merge commit found, exiting"
+              exit 1
+            fi
             # setup proper tags
-            if [[ "$CIRCLE_BRANCH" = "master" && "$CIRCLE_TAG" ]]; then
-              DOCKER_TAG=latest
-              DOCKER_BUILD_TAG=$CIRCLE_TAG
-            elif [[ "$CIRCLE_BRANCH" = "master" ]]; then
+            if [[ "$CIRCLE_BRANCH" = "master" || "$CIRCLE_BRANCH" = "noss-test" ]]; then
               DOCKER_TAG=latest
               DOCKER_BUILD_TAG="build-${CIRCLE_BUILD_NUM}"
+              should_push_commit=yes
             elif [[ "$CIRCLE_TAG" ]]; then
               DOCKER_TAG=$CIRCLE_TAG
-              if [[ $CIRCLE_TAG =~ ^deploy-dev- ]]; then
+              if [[ $(echo $CIRCLE_TAG | grep ^deploy-dev- ) ]]; then
                 DOCKER_TAG=deploy-dev
                 DOCKER_BUILD_TAG=$CIRCLE_TAG
-              elif [[ $CIRCLE_TAG =~ ^deploy-staging- ]]; then
-                DOCKER_TAG=deploy-staging
-                DOCKER_BUILD_TAG=$CIRCLE_TAG
+                should_push_commit=yes
               fi
-            elif [[ "$CIRCLE_BRANCH" = "deploy-prod" ]]; then
-              DOCKER_TAG=deploy-prod
-              DOCKER_BUILD_TAG="deploy-prod-build-${CIRCLE_BUILD_NUM}"
+            elif [[ "$CIRCLE_BRANCH" = "staging-release" ]]; then
+              if [[ "$should_build" = "yes" ]] ; then
+                echo "This commit $commit has not been built yet, so failing"
+                echo " the build for staging."
+                echo "Make sure this commit is built on master, and there are"
+                echo " only ff merge commits to staging and those"
+                echo " merge commits have no conflicts"
+                exit 1
+              fi
+              DOCKER_TAG=staging-release
+              DOCKER_BUILD_TAG="staging-release-build-${CIRCLE_BUILD_NUM}"
+              should_push_commit_rc=yes
+            elif [[ "$CIRCLE_BRANCH" = "production-release" ]]; then
+              if [[ "$should_build" = "yes" ]] ; then
+                echo "This commit $commit has not been built yet, so failing"
+                echo " the build for production."
+                echo "Make sure this commit is built on master, and there are"
+                echo " only ff merge commits to production and those"
+                echo " merge commits have no conflicts"
+                exit 1
+              fi
+              echo "would have checked dockerhub for ${commit}-rc"
+              found=$FOUND_RC
+              if [[ ! "$found" ]]; then
+                echo "Did not find ${commit}-rc, you must test this first on"
+                echo " staging before deploying to production."
+                exit 1
+              fi
+              DOCKER_TAG=production-release
+              DOCKER_BUILD_TAG="production-release-build-${CIRCLE_BUILD_NUM}"
             else
               DOCKER_TAG=$CIRCLE_BRANCH
               DOCKER_BUILD_TAG="${CIRCLE_BRANCH}-build-${CIRCLE_BUILD_NUM}"
             fi
-            # process tags
-            echo "docker tag is: ${DOCKER_TAG}"
+            # display tags
+            echo "tag is: " $DOCKER_TAG
+            if [[ "$should_build" = "yes" ]] ; then
+              echo "building container"
+              if [[ "$should_push_commit" = "yes" ]] ; then
+                echo "setting up for webpack to upload to S3"
+              fi
+              if [[ "$should_push_commit" = "yes" ]] ; then
+                # tag and push this commit hash
+                echo "would have pushed this commit tag $commit"
+              fi
+            else
+              echo "pulling and re-tagging container"
+              if [[ "$should_push_commit_rc" = "yes" ]] ; then
+                # tag and push ${this commit hash}-rc
+                echo "pushing this commit tag ${commit}-rc"
+              fi
+            fi
+            # check if we should push to additional tag
             if [[ "$DOCKER_BUILD_TAG" ]]; then
-              # persist DOCKER_BUILD_TAG
-              echo "docker build tag is: ${DOCKER_BUILD_TAG}"
-              echo $DOCKER_BUILD_TAG > /tmp/workspace/image_tag
+              echo "persisting commit ${commit}"
+              echo $commit > /tmp/workspace/git_commit_sha
+              echo "also pushing to tag: " $DOCKER_BUILD_TAG
+              # persist IMAGE_TAG for next step of workflow
+              DOCKER_IMAGE="${DOCKER_BUILD_TAG}"
+              echo "persisting docker_image: ${DOCKER_IMAGE} to workspace"
+              echo "$DOCKER_IMAGE" > /tmp/workspace/docker_image
             fi
       - persist_to_workspace:
           root: /tmp/workspace
           paths:
-            - image_tag
+            - docker_image
+            - git_commit_sha
   deploy-dev:
     docker:
-      - image: circleci/python:3
+      - image: fitnesskeeper/docker-ci-builder
     steps:
       - attach_workspace:
           at: /tmp/workspace
+      - checkout
       - run:
           name: Placeholder for deploy dev
           command: |
-            IMAGE_TAG=$(cat /tmp/workspace/image_tag)
-            if [[ ! "$IMAGE_TAG" ]]; then
-              echo "could not read image tag from workspace"
+            DOCKER_IMAGE=$(cat /tmp/workspace/docker_image)
+            if [[ ! "$DOCKER_IMAGE" ]]; then
+              echo "could not read docker_image from workspace"
               exit 1
             fi
-            echo "triggering circle ci build that would deploy image: ${IMAGE_TAG} to dev environment"
-            RETURN=$(curl -u ${CIRCLE_API_TOKEN}: \
-              --data build_parameters[CIRCLE_JOB]=deploy-dev \
-              --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
-              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/master)
-            echo $RETURN | python3 -m json.tool
-            BUILD_URL=$(echo $RETURN | python3 -c "import sys, json; print(json.load(sys.stdin)['build_url'])")
-            echo "check ${BUILD_URL} for deploy status"
+            GIT_COMMIT_SHA=$(cat /tmp/workspace/git_commit_sha)
+            if [[ ! "$GIT_COMMIT_SHA" ]]; then
+              echo "could not read git_commit_sha from workspace"
+              exit 1
+            fi
+            echo "triggering circle ci build that would deploy image: ${DOCKER_IMAGE} to dev environment"
+            echo $GIT_COMMIT_SHA
+
   deploy-staging:
     docker:
-      - image: circleci/python:3
+      - image: fitnesskeeper/docker-ci-builder
     steps:
       - attach_workspace:
           at: /tmp/workspace
+      - checkout
       - run:
           name: Placeholder for deploy staging
           command: |
-            IMAGE_TAG=$(cat /tmp/workspace/image_tag)
-            if [[ ! "$IMAGE_TAG" ]]; then
-              echo "could not read image tag from workspace"
+            DOCKER_IMAGE=$(cat /tmp/workspace/docker_image)
+            if [[ ! "$DOCKER_IMAGE" ]]; then
+              echo "could not read api_docker_image from workspace"
               exit 1
             fi
-            echo "triggering circle ci build that would deploy image: ${IMAGE_TAG} to staging environment"
-            RETURN=$(curl -u ${CIRCLE_API_TOKEN}: \
-              --data build_parameters[CIRCLE_JOB]=deploy-staging \
-              --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
-              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/master)
-            echo $RETURN | python3 -m json.tool
-            BUILD_URL=$(echo $RETURN | python3 -c "import sys, json; print(json.load(sys.stdin)['build_url'])")
-            echo "check ${BUILD_URL} for deploy status"
+            GIT_COMMIT_SHA=$(cat /tmp/workspace/git_commit_sha)
+            if [[ ! "$GIT_COMMIT_SHA" ]]; then
+              echo "could not read git_commit_sha from workspace"
+              exit 1
+            fi
+            echo "triggering circle ci build that would deploy image: ${DOCKER_IMAGE} to staging environment"
+            echo $GIT_COMMIT_SHA
+
   deploy-prod:
     docker:
-      - image: circleci/python:3
+      - image: fitnesskeeper/docker-ci-builder
     steps:
       - attach_workspace:
           at: /tmp/workspace
+      - checkout
       - run:
           name: Placeholder for deploy prod
           command: |
-            IMAGE_TAG=$(cat /tmp/workspace/image_tag)
-            if [[ ! "$IMAGE_TAG" ]]; then
-              echo "could not read image tag from workspace"
+            DOCKER_IMAGE=$(cat /tmp/workspace/docker_image)
+            if [[ ! "$DOCKER_IMAGE" ]]; then
+              echo "could not read docker_image from workspace"
               exit 1
             fi
-            echo "triggering circle ci build that would deploy image: ${IMAGE_TAG} to prod"
-            RETURN=$(curl -u ${CIRCLE_API_TOKEN}: \
-              --data build_parameters[CIRCLE_JOB]=deploy-prod \
-              --data build_parameters[IMAGE_TAG]=${IMAGE_TAG} \
-              https://circleci.com/api/v1.1/project/github/FitnessKeeper/noss-circleci-test2/tree/master)
-            echo $RETURN | python3 -m json.tool
-            BUILD_URL=$(echo $RETURN | python3 -c "import sys, json; print(json.load(sys.stdin)['build_url'])")
-            echo "check ${BUILD_URL} for deploy status"
+            GIT_COMMIT_SHA=$(cat /tmp/workspace/git_commit_sha)
+            if [[ ! "$GIT_COMMIT_SHA" ]]; then
+              echo "could not read git_commit_sha from workspace"
+              exit 1
+            fi
+            echo "triggering circle ci build that would deploy image: ${DOCKER_IMAGE} to prod"
+            echo $GIT_COMMIT_SHA
 
 workflows:
   version: 2
-  build:
+  build_and_deploy:
     jobs:
       - build:
           filters:
             tags:
-              only: /^(v(\d+\.){2}\d+|deploy-(dev-.+|staging-.+))$/
+              only: /^(v(\d+\.){2}\d+|deploy-dev-.+)$/
       - deploy-dev:
           requires:
             - build
@@ -157,13 +199,11 @@ workflows:
           requires:
             - build
           filters:
-            tags:
-              only: /^deploy-staging-.+/
             branches:
-              ignore: /.*/
+              only: staging-release
       - deploy-prod:
           requires:
             - build
           filters:
             branches:
-              only: deploy-prod
+              only: production-release
