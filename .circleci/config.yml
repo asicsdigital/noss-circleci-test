@@ -119,10 +119,7 @@ workflows:
   version: 2
   build:
     jobs:
-      - build:
-          filters:
-            tags:
-              only: /^(v(\d+\.){2}\d+|deploy-(dev-.+|staging-.+))$/
+      - build
       - deploy-dev:
           requires:
             - build
